@@ -39,21 +39,12 @@ Memory_T realMem;
 	while (prog_counter < prog_size) {
 		//fprintf(stderr, "(%u)", prog_counter);
 
-		um_inst = seg_get(UMprogram, prog_counter);
-        //um_inst = mem_read(realMem, prog_ID, prog_counter);
+		//um_inst = seg_get(UMprogram, prog_counter);
+		um_inst = *(UMprogram + (prog_counter + 1));
 
 
 		decode_inst(um_inst, &prog_counter, &prog_size, &UMprogram);
 		prog_counter++;
-
-
-		//fprintf(stderr, "Here\n");
-		// if (UMprogram == NULL) {	/* if a different prog was loaded */
-		// 	fprintf(stderr, "Before changing the program\n");
-
-		// 	UMprogram = mem_getProg(realMem);
-		// 	fprintf(stderr, "After changing the program\n");
-		// }
 	}
 
 }
