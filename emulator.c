@@ -1,17 +1,15 @@
 #include "emulator.h"
 #include "memory.h"
-#include "bitpack.h"
 #include "unistd.h"
 
 #define OPCODE_LSB 28
-#define OPCODE_WIDTH 4 
-#define RA_LSB 6
-#define RA_LSB_onereg 25
-#define RB_LSB 3
-#define RC_LSB 0
-#define REG_WIDTH 3
-#define VAL_LSB 0
-#define VAL_WIDTH 25
+#define OPCODE_WIDTH 4
+#define RA_SHIFTLEFT 23
+#define RB_SHIFTLEFT 26
+#define RC_SHIFTLEFT 29
+#define R_SHIFTRIGHT 29
+#define VAL_SHIFTLEFT 7
+#define VAL_SHIFTRIGHT 7
 #define REG_SIZE 4294967296 /* 2 ^ 32 */
 
 int decode_inst(uint32_t instruction, uint32_t* pc, uint32_t* ps);
@@ -49,69 +47,47 @@ Memory_T realMem;
 int decode_inst(uint32_t instruction, uint32_t* pc, uint32_t* ps)
 {
 
-	uint32_t opcode = Bitpack_getu(instruction, OPCODE_WIDTH, OPCODE_LSB);
-	uint32_t ra, rb, rc;	/* indices to regs[] */
 	uint32_t val;
+	char c;
 	int success = 1;
 	int failed = 0;
 
+	/* extract opcode and indicies to regs[] */ 
+	uint32_t opcode = instruction >> OPCODE_LSB;
+	uint32_t ra = (instruction << RA_SHIFTLEFT) >> R_SHIFTRIGHT;
+	uint32_t rb = (instruction << RB_SHIFTLEFT) >> R_SHIFTRIGHT;
+	uint32_t rc = (instruction << RC_SHIFTLEFT) >> R_SHIFTRIGHT;
+
 	switch (opcode) {
 		case 0: /* conditional move */
-			ra = Bitpack_getu(instruction, REG_WIDTH, RA_LSB);
-			rb = Bitpack_getu(instruction, REG_WIDTH, RB_LSB);
-			rc = Bitpack_getu(instruction, REG_WIDTH, RC_LSB);
-
 			if (regs[rc] != 0)
 				regs[ra] = regs[rb];
 
 			return success;
 
 		case 1: /* segmented load */
-			ra = Bitpack_getu(instruction, REG_WIDTH, RA_LSB);
-			rb = Bitpack_getu(instruction, REG_WIDTH, RB_LSB);
-			rc = Bitpack_getu(instruction, REG_WIDTH, RC_LSB);
 			val = mem_read(realMem, regs[rb], regs[rc]);
 
 			regs[ra] = val;
 			return success;
 
-		case 2: /* segmented store */
-			ra = Bitpack_getu(instruction, REG_WIDTH, RA_LSB);
-			rb = Bitpack_getu(instruction, REG_WIDTH, RB_LSB);
-			rc = Bitpack_getu(instruction, REG_WIDTH, RC_LSB);
-			
+		case 2: /* segmented store */	
 			mem_write(realMem, regs[rc], regs[ra], regs[rb]);
 			return success;
 
 		case 3: /* addition */ 
-			ra = Bitpack_getu(instruction, REG_WIDTH, RA_LSB);
-			rb = Bitpack_getu(instruction, REG_WIDTH, RB_LSB);
-			rc = Bitpack_getu(instruction, REG_WIDTH, RC_LSB);
-
 			regs[ra] = regs[rb] + regs[rc];
 			return success;
 
 		case 4: /* multiplcation */
-			ra = Bitpack_getu(instruction, REG_WIDTH, RA_LSB);
-			rb = Bitpack_getu(instruction, REG_WIDTH, RB_LSB);
-			rc = Bitpack_getu(instruction, REG_WIDTH, RC_LSB);
-
 			regs[ra] = (regs[rb] * regs[rc]) % REG_SIZE;
 			return success;
 
 		case 5: /* divison */
-			ra = Bitpack_getu(instruction, REG_WIDTH, RA_LSB);
-			rb = Bitpack_getu(instruction, REG_WIDTH, RB_LSB);
-			rc = Bitpack_getu(instruction, REG_WIDTH, RC_LSB);
-
 			regs[ra] = (regs[rb] / regs[rc]) % REG_SIZE;
 			return success;
 
 		case 6: /* NAND */
-			ra = Bitpack_getu(instruction, REG_WIDTH, RA_LSB);
-			rb = Bitpack_getu(instruction, REG_WIDTH, RB_LSB);
-			rc = Bitpack_getu(instruction, REG_WIDTH, RC_LSB);
-
 			regs[ra] = ~(regs[rb] & regs[rc]);
 			return success;
 
@@ -120,9 +96,6 @@ int decode_inst(uint32_t instruction, uint32_t* pc, uint32_t* ps)
 			exit(0);
 
 		case 8: /* map segment */
-			rb = Bitpack_getu(instruction, REG_WIDTH, RB_LSB);
-			rc = Bitpack_getu(instruction, REG_WIDTH, RC_LSB);
-
 			regs[rb] = map(realMem, regs[rc]);
 			if (regs[rb] == 0) {
 				fprintf(stderr, "Emulator out of memory");
@@ -132,21 +105,15 @@ int decode_inst(uint32_t instruction, uint32_t* pc, uint32_t* ps)
 			return success;
 
 		case 9: /* unmap segment */
-			rc = Bitpack_getu(instruction, REG_WIDTH, RC_LSB);
-
 			unmap(realMem, regs[rc]);
 			return success;
 
 		case 10: /* output */
-			rc = Bitpack_getu(instruction, REG_WIDTH, RC_LSB);
-
-			char c = regs[rc];
+			c = regs[rc];
 			write(1, &c, 1);
 			return success;
 
 		case 11: /* input */ 
-			rc = Bitpack_getu(instruction, REG_WIDTH, RC_LSB);
-            
 			val = read(0, &c, 1);
 			if (val == 0)
 				regs[rc] = ~0;
@@ -156,9 +123,6 @@ int decode_inst(uint32_t instruction, uint32_t* pc, uint32_t* ps)
 			return success;
 
 		case 12: /* load program */ 
-			rb = Bitpack_getu(instruction, REG_WIDTH, RB_LSB);
-			rc = Bitpack_getu(instruction, REG_WIDTH, RC_LSB);
-            
             if (regs[rb] != 0) {
                 val = duplicate(realMem, regs[rb], 0);
                 *ps = val;
@@ -168,9 +132,8 @@ int decode_inst(uint32_t instruction, uint32_t* pc, uint32_t* ps)
 			return success;
 
 		case 13: /* load value */
-			ra = Bitpack_getu(instruction, REG_WIDTH,
-				RA_LSB_onereg);
-			val = Bitpack_getu(instruction, VAL_WIDTH, VAL_LSB);
+			ra = (instruction << OPCODE_WIDTH) >> R_SHIFTRIGHT;
+			val = (instruction << VAL_SHIFTLEFT) >> VAL_SHIFTRIGHT;
 
 			regs[ra] = val;
 			return success;
