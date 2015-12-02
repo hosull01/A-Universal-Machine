@@ -1,6 +1,7 @@
 #include "emulator.h"
 #include "memory.h"
 #include "unistd.h"
+#include "assert.h"
 
 #define OPCODE_LSB 28
 #define OPCODE_WIDTH 4
@@ -12,7 +13,8 @@
 #define VAL_SHIFTRIGHT 7
 #define REG_SIZE 4294967296 /* 2 ^ 32 */
 
-int decode_inst(uint32_t instruction, uint32_t* pc, uint32_t* ps);
+int decode_inst(uint32_t instruction, uint32_t* pc, uint32_t* ps, 
+		Segment* prog);
 void execute_prog(uint32_t start, uint32_t end);
 
 
@@ -35,16 +37,29 @@ Memory_T realMem;
 	uint32_t um_inst;
 
 	while (prog_counter < prog_size) {
-        
-		um_inst = mem_read(realMem, prog_ID, prog_counter);
-		decode_inst(um_inst, &prog_counter, &prog_size);
+		//fprintf(stderr, "(%u)", prog_counter);
+
+		um_inst = seg_get(UMprogram, prog_counter);
+        //um_inst = mem_read(realMem, prog_ID, prog_counter);
+
+
+		decode_inst(um_inst, &prog_counter, &prog_size, &UMprogram);
 		prog_counter++;
+
+
+		//fprintf(stderr, "Here\n");
+		// if (UMprogram == NULL) {	/* if a different prog was loaded */
+		// 	fprintf(stderr, "Before changing the program\n");
+
+		// 	UMprogram = mem_getProg(realMem);
+		// 	fprintf(stderr, "After changing the program\n");
+		// }
 	}
 
 }
 
 
-int decode_inst(uint32_t instruction, uint32_t* pc, uint32_t* ps)
+int decode_inst(uint32_t instruction, uint32_t* pc, uint32_t* ps, Segment* prog)
 {
 
 	uint32_t val;
@@ -58,6 +73,7 @@ int decode_inst(uint32_t instruction, uint32_t* pc, uint32_t* ps)
 	uint32_t rb = (instruction << RB_SHIFTLEFT) >> R_SHIFTRIGHT;
 	uint32_t rc = (instruction << RC_SHIFTLEFT) >> R_SHIFTRIGHT;
 
+
 	switch (opcode) {
 		case 0: /* conditional move */
 			if (regs[rc] != 0)
@@ -66,13 +82,16 @@ int decode_inst(uint32_t instruction, uint32_t* pc, uint32_t* ps)
 			return success;
 
 		case 1: /* segmented load */
+			//fprintf(stderr, "mem_read called\n");
 			val = mem_read(realMem, regs[rb], regs[rc]);
 
 			regs[ra] = val;
 			return success;
 
-		case 2: /* segmented store */	
+		case 2: /* segmented store */
+		//fprintf(stderr, "mem_write called");	
 			mem_write(realMem, regs[rc], regs[ra], regs[rb]);
+		//	fprintf(stderr, "mem_write returned: rc %u ra %u rb %u\n", regs[rc], regs[ra], regs[rb]);
 			return success;
 
 		case 3: /* addition */ 
@@ -124,10 +143,13 @@ int decode_inst(uint32_t instruction, uint32_t* pc, uint32_t* ps)
 
 		case 12: /* load program */ 
             if (regs[rb] != 0) {
-                val = duplicate(realMem, regs[rb], 0);
+            	//fprintf(stderr, "changing program by duplicating --- ");
+                val = duplicate(realMem, regs[rb], 0, prog);
                 *ps = val;
+                //fprintf(stderr, "ps is %u  pc is %u\n", val, regs[rc] - 1);
             }
-            
+            assert(prog);
+
 			*pc = regs[rc] - 1;
 			return success;
 

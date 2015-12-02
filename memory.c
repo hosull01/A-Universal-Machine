@@ -67,6 +67,13 @@ inline uint32_t mem_read (Memory_T memory, uint32_t segID, uint32_t offset)
 	return seg_get(segment, offset);
 }
 
+inline Segment mem_getProg (Memory_T memory)
+{
+    assert(memory);
+
+    return Seq_get(memory->realMem, 0);
+}
+
 
 /*
  * purp: creating a new segment 
@@ -136,7 +143,8 @@ inline uint32_t memory_seglength(Memory_T memory, uint32_t segID)
 	return seg_length(segment);
 }
 
-inline uint32_t duplicate(Memory_T memory, uint32_t toDup_ID, uint32_t toRep_ID)
+inline uint32_t duplicate(Memory_T memory, uint32_t toDup_ID, uint32_t toRep_ID,
+    Segment* UMprogram)
 {
     assert(memory);
     
@@ -145,10 +153,13 @@ inline uint32_t duplicate(Memory_T memory, uint32_t toDup_ID, uint32_t toRep_ID)
     
     /* duplicate segment */
 	Segment seg_to_duplicate = seg_copy(Seq_get(memory->realMem, toDup_ID));
+    *UMprogram = seg_to_duplicate;
+
     
     /* place duplicate segment in new memory location */
     Segment seg_to_replace = Seq_put(memory->realMem, toRep_ID,
 				 seg_to_duplicate);
+     
     
     size_dup = seg_length(seg_to_duplicate);
     size_rep = seg_length(seg_to_replace);
@@ -158,7 +169,8 @@ inline uint32_t duplicate(Memory_T memory, uint32_t toDup_ID, uint32_t toRep_ID)
     
     /* delete item that was in the duplicate's current location */
     seg_delete(seg_to_replace);
-	
+  
+
 	return seg_length(seg_to_duplicate);
 }
 
