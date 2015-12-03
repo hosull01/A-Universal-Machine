@@ -31,8 +31,8 @@ Memory_T realMem;
 {
 	realMem = new_Memory(UMprogram);
 
-	uint32_t prog_ID = 0;
-	uint32_t prog_size = memory_seglength(realMem, prog_ID);
+	//uint32_t prog_ID = 0;
+	uint32_t prog_size = *(UMprogram);
 	uint32_t prog_counter = 0;
 	uint32_t um_inst;
 

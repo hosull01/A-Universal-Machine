@@ -47,7 +47,7 @@ case $link in
 esac
 
 # case $link in
-#  all|mem) gcc $FLAGS -o mem memory_test.o memory.o segment.o \
+#  all|mem) gcc $FLAGS -o mem memory_test.o memory.o segment.o umstack.o \
 #               $LIBS $CIILIBS  $LFLAGS 
 #             linked=yes ;;
 # esac
