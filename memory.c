@@ -7,6 +7,8 @@
 
 struct Memory_T {
 	Seq_T realMem;
+    uint32_t recent_id1, recent_id2;    /* cached segments id */
+    Segment recent_seg1, recent_seg2; /* cached segments */
 	Stack_T unmappedIDs;
 	int memUsed;
 };
@@ -19,7 +21,7 @@ struct Memory_T {
  */
 Memory_T new_Memory(Segment program)
 {
-    assert(program);
+    //assert(program);
 	Memory_T memory = malloc(sizeof(*memory));
 
 	/* create new memory & add new instructions */ 
@@ -30,6 +32,11 @@ Memory_T new_Memory(Segment program)
 
 	/* create stack to account unmappedIDs */ 
 	memory->unmappedIDs = Stack_new();
+
+    /* initialising id of cached segments */
+    memory->recent_id1 = 0;
+    memory->recent_seg1 = program;
+    memory->recent_id2 = -1;
 
 	return memory;
 }
@@ -43,12 +50,28 @@ Memory_T new_Memory(Segment program)
 inline void mem_write (Memory_T memory, uint32_t word, uint32_t segID, 
  	                   uint32_t offset)
  {
-     assert(memory);
-     
-     Segment s = Seq_get(memory->realMem, segID);
-     
-     // if s is null send error message
-     seg_put(s, word, offset);
+     //assert(memory);
+
+     if (memory->recent_id1 == segID) { 
+        /* offset incremented bc segments are indexed from 1 */
+         *(memory->recent_seg1 + (offset + 1)) = word;
+         return;
+     }
+
+     if (memory->recent_id2 == segID) {
+        *(memory->recent_seg2 + (offset + 1)) = word;
+        return;
+     }
+
+     if (segID % 2 == 0) {
+        memory->recent_id1 = segID;
+        memory->recent_seg1 = Seq_get(memory->realMem, segID);
+        *(memory->recent_seg1 + (offset + 1)) = word;
+     } else {
+        memory->recent_id2 = segID;
+        memory->recent_seg2 = Seq_get(memory->realMem, segID);
+        *(memory->recent_seg2 + (offset + 1)) = word;
+     }
  }
 
 
@@ -60,16 +83,32 @@ inline void mem_write (Memory_T memory, uint32_t word, uint32_t segID,
  */
 inline uint32_t mem_read (Memory_T memory, uint32_t segID, uint32_t offset)
 {
-    assert(memory);
+    //assert(memory);
 
-    Segment segment = Seq_get(memory->realMem, segID);
+    if (memory->recent_id1 == segID) { 
+        /* offset incremented bc segments are indexed from 1 */
+        return *(memory->recent_seg1 + (offset + 1));
+    }
 
-	return seg_get(segment, offset);
+    if (memory->recent_id2 == segID) {
+        return *(memory->recent_seg2 + (offset + 1));
+    }
+
+    if (segID % 2 == 0) {
+        memory->recent_id1 = segID;
+        memory->recent_seg1 = Seq_get(memory->realMem, segID);
+        return *(memory->recent_seg1 + (offset + 1));
+     } else {
+        memory->recent_id2 = segID;
+        memory->recent_seg2 = Seq_get(memory->realMem, segID);
+        return *(memory->recent_seg2 + (offset + 1));
+     }
+
 }
 
 inline Segment mem_getProg (Memory_T memory)
 {
-    assert(memory);
+    //assert(memory);
 
     return Seq_get(memory->realMem, 0);
 }
@@ -83,7 +122,7 @@ inline Segment mem_getProg (Memory_T memory)
  */
 inline uint32_t map(Memory_T memory, uint32_t size)
 {
-    assert(memory);
+    //assert(memory);
     
 	if((memory->memUsed + size + 1) <= CAPACITY) {
 		Segment new_seg = seg_create(size);
@@ -116,13 +155,14 @@ inline uint32_t map(Memory_T memory, uint32_t size)
  */
 inline void unmap(Memory_T memory, uint32_t segID)
 {
-    assert(memory && segID);
+    //assert(memory && segID);
     
 	uint32_t seg_size = seg_length(Seq_get(memory->realMem, segID));
     Segment umapped_seg;
     
 	uint32_t *uID = malloc(sizeof(uint32_t));
 	*uID = segID;
+
 	
 	/* Delete element and place NULL has empty placeholder */ 
 	umapped_seg = Seq_put(memory->realMem, segID, NULL);
@@ -130,13 +170,21 @@ inline void unmap(Memory_T memory, uint32_t segID)
     
     /* free memory */
 	memory->memUsed -= seg_size + 1;
+
+    /* update cache ids */
+    if (memory->recent_id1 == segID) {
+        memory->recent_id1 = -1;
+    }
+    if (memory->recent_id2 == segID) {
+        memory->recent_id2 = -1;
+    }
     
 	Stack_push(memory->unmappedIDs, (void *) uID);
 }
 
 inline uint32_t memory_seglength(Memory_T memory, uint32_t segID)
 {
-    assert(memory);
+    //assert(memory);
     
 	Segment segment = Seq_get(memory->realMem, segID);
 
@@ -146,7 +194,7 @@ inline uint32_t memory_seglength(Memory_T memory, uint32_t segID)
 inline uint32_t duplicate(Memory_T memory, uint32_t toDup_ID, uint32_t toRep_ID,
     Segment* UMprogram)
 {
-    assert(memory);
+    //assert(memory);
     
     uint32_t size_dup;
     uint32_t size_rep;
@@ -176,7 +224,7 @@ inline uint32_t duplicate(Memory_T memory, uint32_t toDup_ID, uint32_t toRep_ID,
 
 inline void mem_free(Memory_T memory)
 {
-    assert(memory);
+    //assert(memory);
     
     /* clear memory sequence */
     while (Seq_length(memory->realMem)) {

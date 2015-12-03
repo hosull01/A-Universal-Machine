@@ -23,7 +23,7 @@ Except_T Offset_Error = {"Offset out of segment bounds\n"};
  */
 inline S seg_create (uint32_t numElem)
 {
-    assert (numElem > 0);
+    //assert (numElem > 0);
     numElem += 1;
     
     S new_seg = calloc(numElem, sizeof(uint32_t));
@@ -36,9 +36,9 @@ inline S seg_create (uint32_t numElem)
     *(new_seg) = numElem;
     
     /* segment initialised with 0s */
-    for (uint32_t i = 1; i < numElem; i++) {
-        *(new_seg + i) = 0;
-    }
+    // for (uint32_t i = 1; i < numElem; i++) {
+    //     *(new_seg + i) = 0;
+    // }
     return new_seg;
 }
 
@@ -48,7 +48,7 @@ inline S seg_create (uint32_t numElem)
  */
 inline void seg_put (S segment, uint32_t val, uint32_t offset)
 {
-    assert(segment);
+    //assert(segment);
     
     offset++;
     if (offset >= *(segment)) {
@@ -61,7 +61,7 @@ inline void seg_put (S segment, uint32_t val, uint32_t offset)
 /* get element from specified location */
 inline uint32_t seg_get (S segment, uint32_t offset)
 {
-    assert(segment);
+    //assert(segment);
     
     offset++;
     if (offset >= *(segment)) {
@@ -74,7 +74,7 @@ inline uint32_t seg_get (S segment, uint32_t offset)
 /* returns a new segment which is an exact copy of passed in segment */
 inline S seg_copy(S segment)
 {
-    assert(segment);
+    //assert(segment);
     uint32_t iter = 0;
     uint32_t len = *(segment);
     Segment new_seg = seg_create(len - 1);
@@ -96,6 +96,6 @@ inline void seg_delete (S segment)
 /* returns the length of a segment */
 inline uint32_t seg_length(S segment)
 {
-    assert(segment);
+    //assert(segment);
     return *(segment) - 1;
 }
