@@ -5,8 +5,19 @@
 #include <stdlib.h>
 #include "stdint.h"
 #include "segment.h"
+#include "umstack.h"
 
-typedef struct Memory_T *Memory_T;
+//typedef struct Memory_T *Memory_T;
+
+typedef struct Memory_T {
+	Segment* realMem;
+    uint32_t recent_id1, recent_id2;    /* cached segments id */
+    Segment recent_seg1, recent_seg2; /* cached segments */
+	umStack unmappedIDs;
+	uint32_t memUsed;
+    uint32_t memCap;
+    uint32_t segCount; 
+} *Memory_T;
 
 
 Memory_T new_Memory(Segment program);

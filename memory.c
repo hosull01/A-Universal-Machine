@@ -5,15 +5,15 @@
 
 #define CAPACITY 250000000	/* 1000MB of memory */
 
-struct Memory_T {
-	Segment* realMem;
-    uint32_t recent_id1, recent_id2;    /* cached segments id */
-    Segment recent_seg1, recent_seg2; /* cached segments */
-	umStack unmappedIDs;
-	uint32_t memUsed;
-    uint32_t memCap;
-    uint32_t segCount; 
-};
+// struct Memory_T {
+// 	Segment* realMem;
+//     uint32_t recent_id1, recent_id2;    /* cached segments id */
+//     Segment recent_seg1, recent_seg2; /* cached segments */
+// 	umStack unmappedIDs;
+// 	uint32_t memUsed;
+//     uint32_t memCap;
+//     uint32_t segCount; 
+// };
 
 /*
  * purp: constructor for new memory 
