@@ -37,8 +37,8 @@ uint32_t memCap;
 uint32_t segCount;
 
 /* cache variables */
- uint32_t recent_id1, recent_id2;
- Segment recent_seg1, recent_seg2;
+ // uint32_t recent_id1, recent_id2;
+ // Segment recent_seg1, recent_seg2;
 
 
 /* 
@@ -55,9 +55,9 @@ uint32_t segCount;
 	segCount = 1;
 	unmappedIDs = Stack_new();
  
-	recent_id1 = 0;
-	recent_seg1 = UMprogram;
-	recent_id2 = -1;
+	// recent_id1 = 0;
+	// recent_seg1 = UMprogram;
+	// recent_id2 = -1;
 
 	uint32_t prog_size = *(UMprogram);
 	uint32_t prog_counter = 0;
@@ -81,7 +81,7 @@ int decode_inst(uint32_t instruction, uint32_t* pc, uint32_t* ps, Segment* prog)
 	//int success = 1;
 	int failed = 0;
 
-	//Segment curr_segment;
+	Segment curr_segment;
 
 	/* extract opcode and indicies to regs[] */ 
 	uint32_t opcode = instruction >> OPCODE_LSB;
@@ -99,50 +99,52 @@ int decode_inst(uint32_t instruction, uint32_t* pc, uint32_t* ps, Segment* prog)
 
 		case 1: /* segmented load */
 
-			if (recent_id1 == regs[rb]) {
-				regs[ra] = *(recent_seg1 + (regs[rc] + 1));
-				break;
-			} 
+			// if (recent_id1 == regs[rb]) {
+			// 	regs[ra] = *(recent_seg1 + (regs[rc] + 1));
+			// 	break;
+			// } 
 
-			if (recent_id2 == regs[rb]) {
-				regs[ra] = *(recent_seg2 + (regs[rc] + 1));
-				break;
-			}
+			// if (recent_id2 == regs[rb]) {
+			// 	regs[ra] = *(recent_seg2 + (regs[rc] + 1));
+			// 	break;
+			// }
 
-			if (!(regs[rb] & 1)) {
-        		recent_id1 = regs[rb];
-        		recent_seg1 = *(realMem + regs[rb]);
-        		regs[ra] = *(recent_seg1 + (regs[rc] + 1));
-     		} else { 
-        		recent_id2 = regs[rb];
-        		recent_seg2 = *(realMem + regs[rb]);
-        		regs[ra] = *(recent_seg2 + (regs[rc] + 1));
-     		}
-
+			// if (!(regs[rb] & 1)) {
+   //      		recent_id1 = regs[rb];
+   //      		recent_seg1 = *(realMem + regs[rb]);
+   //      		regs[ra] = *(recent_seg1 + (regs[rc] + 1));
+   //   		} else { 
+   //      		recent_id2 = regs[rb];
+   //      		recent_seg2 = *(realMem + regs[rb]);
+   //      		regs[ra] = *(recent_seg2 + (regs[rc] + 1));
+   //   		}
+			curr_segment = *(realMem + regs[rb]);
+			regs[ra] = *(curr_segment + (regs[rc] + 1));
 			break;
 
 		case 2: /* segmented store */
 
-			if (recent_id1 == regs[ra]) {
-				*(recent_seg1 + (regs[rb] + 1)) = regs[rc];
-				break;
-			} 
+			// if (recent_id1 == regs[ra]) {
+			// 	*(recent_seg1 + (regs[rb] + 1)) = regs[rc];
+			// 	break;
+			// } 
 
-			if (recent_id2 == regs[ra]) {
-				*(recent_seg2 + (regs[rb] + 1)) = regs[rc];
-				break;
-			}
+			// if (recent_id2 == regs[ra]) {
+			// 	*(recent_seg2 + (regs[rb] + 1)) = regs[rc];
+			// 	break;
+			// }
 
-			if (!(regs[ra] & 1)) {
-        		recent_id1 = regs[ra];
-        		recent_seg1 = *(realMem + regs[ra]);
-        		*(recent_seg1 + (regs[rb] + 1)) = regs[rc];
-     		} else { 
-        		recent_id2 = regs[ra];
-        		recent_seg2 = *(realMem + regs[ra]);
-        		*(recent_seg2 + (regs[rb] + 1)) = regs[rc];
-     		}
-		
+			// if (!(regs[ra] & 1)) {
+   //      		recent_id1 = regs[ra];
+   //      		recent_seg1 = *(realMem + regs[ra]);
+   //      		*(recent_seg1 + (regs[rb] + 1)) = regs[rc];
+   //   		} else { 
+   //      		recent_id2 = regs[ra];
+   //      		recent_seg2 = *(realMem + regs[ra]);
+   //      		*(recent_seg2 + (regs[rb] + 1)) = regs[rc];
+   //   		}
+			curr_segment = *(realMem + regs[ra]);
+			*(curr_segment + (regs[rb] + 1)) = regs[rc];
 			break;
 
 		case 3: /* addition */ 
@@ -251,12 +253,12 @@ static inline void unmap(uint32_t segID)
 	segCount--;
 
 	/* update cache ids */
-    if (recent_id1 == segID) {
-        recent_id1 = -1;
-    }
-    if (recent_id2 == segID) {
-        recent_id2 = -1;
-    }
+    // if (recent_id1 == segID) {
+    //     recent_id1 = -1;
+    // }
+    // if (recent_id2 == segID) {
+    //     recent_id2 = -1;
+    // }
 
 	Stack_push(unmappedIDs, segID);
 }
