@@ -12,6 +12,20 @@
 #define VAL_SR 7
 #define REG_SIZE 4294967296 /* 2 ^ 32 */
 
+#define RA_LSB 6
+#define RA_LSB_onereg 25
+#define RB_LSB 3
+#define RC_LSB 0
+#define REG_WIDTH 3
+#define VAL_LSB 0
+
+/* masks */
+#define RA_MASK  0x1C0
+#define RB_MASK  0x38
+#define RC_MASK  0x7
+#define VAL_MASK 0x1FFFFFF
+#define R_MASK   0xE000000
+
 
 int decode_inst(uint32_t instruction, uint32_t* pc, uint32_t* ps, 
 		Segment* prog);
@@ -73,9 +87,10 @@ uint32_t stkCap;
 	uint32_t opcode, ra, rb, rc, val;
 	char c;
 
+
 	/* run um */
 	while (1) {
-		um_inst = *(program_seg + (prog_counter + 1));
+		um_inst = program_seg[prog_counter + 1];
 
 		/* decode instruction */
 		/* extract opcode and indicies to regs[] */ 
@@ -83,9 +98,9 @@ uint32_t stkCap;
 
 		switch (opcode) {
 			case 0: /* conditional move */
-				ra = (um_inst << RA_SL) >> R_SR;
-				rb = (um_inst << RB_SL) >> R_SR;
-		 		rc = (um_inst << RC_SL) >> R_SR;
+				ra = (um_inst & RA_MASK) >> RA_LSB;
+				rb = (um_inst & RB_MASK) >> RB_LSB;
+		 		rc = (um_inst & RC_MASK);
 
 				if (regs[rc] != 0)
 					regs[ra] = regs[rb];
@@ -93,9 +108,9 @@ uint32_t stkCap;
 				break;
 
 			case 1: /* segmented load */
-				ra = (um_inst << RA_SL) >> R_SR;
-				rb = (um_inst << RB_SL) >> R_SR;
-		 		rc = (um_inst << RC_SL) >> R_SR;
+				ra = (um_inst & RA_MASK) >> RA_LSB;
+				rb = (um_inst & RB_MASK) >> RB_LSB;
+		 		rc = (um_inst & RC_MASK);
 
 				if (recent_id1 == regs[rb]) {
 					regs[ra] = *(recent_seg1 + (regs[rc] + 1));
@@ -120,9 +135,9 @@ uint32_t stkCap;
 				break;
 
 			case 2: /* segmented store */
-				ra = (um_inst << RA_SL) >> R_SR;
-				rb = (um_inst << RB_SL) >> R_SR;
-		 		rc = (um_inst << RC_SL) >> R_SR;
+				ra = (um_inst & RA_MASK) >> RA_LSB;
+				rb = (um_inst & RB_MASK) >> RB_LSB;
+		 		rc = (um_inst & RC_MASK);
 
 				if (recent_id1 == regs[ra]) {
 					*(recent_seg1 + (regs[rb] + 1)) = regs[rc];
@@ -147,33 +162,33 @@ uint32_t stkCap;
 				break;
 
 			case 3: /* addition */ 
-				ra = (um_inst << RA_SL) >> R_SR;
-				rb = (um_inst << RB_SL) >> R_SR;
-		 		rc = (um_inst << RC_SL) >> R_SR;
+				ra = (um_inst & RA_MASK) >> RA_LSB;
+				rb = (um_inst & RB_MASK) >> RB_LSB;
+		 		rc = (um_inst & RC_MASK);
 
 				regs[ra] = regs[rb] + regs[rc];
 				break;
 
 			case 4: /* multiplcation */
-				ra = (um_inst << RA_SL) >> R_SR;
-				rb = (um_inst << RB_SL) >> R_SR;
-		 		rc = (um_inst << RC_SL) >> R_SR;
+				ra = (um_inst & RA_MASK) >> RA_LSB;
+				rb = (um_inst & RB_MASK) >> RB_LSB;
+		 		rc = (um_inst & RC_MASK);
 
 				regs[ra] = (regs[rb] * regs[rc]) % REG_SIZE;
 				break;
 
 			case 5: /* divison */
-				ra = (um_inst << RA_SL) >> R_SR;
-				rb = (um_inst << RB_SL) >> R_SR;
-		 		rc = (um_inst << RC_SL) >> R_SR;
+				ra = (um_inst & RA_MASK) >> RA_LSB;
+				rb = (um_inst & RB_MASK) >> RB_LSB;
+		 		rc = (um_inst & RC_MASK);
 
 				regs[ra] = (regs[rb] / regs[rc]) % REG_SIZE;
 				break;
 
 			case 6: /* NAND */
-				ra = (um_inst << RA_SL) >> R_SR;
-				rb = (um_inst << RB_SL) >> R_SR;
-		 		rc = (um_inst << RC_SL) >> R_SR;
+				ra = (um_inst & RA_MASK) >> RA_LSB;
+				rb = (um_inst & RB_MASK) >> RB_LSB;
+		 		rc = (um_inst & RC_MASK);
 
 				regs[ra] = ~(regs[rb] & regs[rc]);
 				break;
@@ -183,8 +198,8 @@ uint32_t stkCap;
 				exit(0);
 
 			case 8: /* map segment */
-				rb = (um_inst << RB_SL) >> R_SR;
-		 		rc = (um_inst << RC_SL) >> R_SR;
+				rb = (um_inst & RB_MASK) >> RB_LSB;
+		 		rc = (um_inst & RC_MASK);
 
 				regs[rb] = map(regs[rc]);
 				if (regs[rb] == 0) {
@@ -195,18 +210,19 @@ uint32_t stkCap;
 				break;
 
 			case 9: /* unmap segment */
-				rc = (um_inst << RC_SL) >> R_SR;
+				rc = (um_inst & RC_MASK);
+
 				unmap(regs[rc]);
 				break;
 
 			case 10: /* output */
-				rc = (um_inst << RC_SL) >> R_SR;
+				rc = (um_inst & RC_MASK);
 				c = regs[rc];
 				write(1, &c, 1);
 				break;
 
 			case 11: /* input */
-				rc = (um_inst << RC_SL) >> R_SR;
+				rc = (um_inst & RC_MASK);
 
 				val = read(0, &c, 1);
 				if (val == 0)
@@ -217,8 +233,9 @@ uint32_t stkCap;
 				break;
 
 			case 12: /* load program */
-				rb = (um_inst << RB_SL) >> R_SR;
-				rc = (um_inst << RC_SL) >> R_SR; 
+				rb = (um_inst & RB_MASK) >> RB_LSB;
+		 		rc = (um_inst & RC_MASK);
+
 		        if (regs[rb] != 0) {
 		            duplicate(regs[rb], 0);
 
@@ -228,8 +245,8 @@ uint32_t stkCap;
 				break;
 
 			case 13: /* load value */
-				ra = (um_inst << OPCODE_WIDTH) >> R_SR;
-				regs[ra] = (um_inst << VAL_SL) >> VAL_SR;
+				ra = (um_inst & R_MASK) >> RA_LSB_onereg;
+				regs[ra] = (um_inst & VAL_MASK);
 
 				break;
 		}
@@ -292,7 +309,7 @@ static inline void unmap(uint32_t segID)
     }
     
     if (stkCount == stkCap) {
-        stkCap += 1000000;
+        stkCap = stkCap * 2;
         umStack = realloc(umStack, sizeof(uint32_t) * stkCap);
     }
     
