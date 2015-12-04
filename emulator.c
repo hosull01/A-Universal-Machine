@@ -18,7 +18,7 @@ int decode_inst(uint32_t instruction, uint32_t* pc, uint32_t* ps,
 void execute_prog(uint32_t start, uint32_t end);
 static inline uint32_t map(uint32_t size);
 static inline void unmap(uint32_t segID);
-static inline uint32_t duplicate(uint32_t toDup_ID, uint32_t toRep_ID);
+static inline void duplicate(uint32_t toDup_ID, uint32_t toRep_ID);
 static inline void mem_free();
 
 
@@ -68,193 +68,174 @@ uint32_t stkCap;
 	program_seg = UMprogram;
 
     /* setup um control loop */
-	uint32_t prog_size = *(UMprogram);
 	uint32_t prog_counter = 0;
 	uint32_t um_inst;
+	uint32_t opcode, ra, rb, rc, val;
+	char c;
 
 	/* run um */
-	while (prog_counter < prog_size) {
-		um_inst = *(*(realMem) + (prog_counter + 1));
+	while (1) {
+		um_inst = *(program_seg + (prog_counter + 1));
 
 		/* decode instruction */
+		/* extract opcode and indicies to regs[] */ 
+		opcode = um_inst >> OPCODE_LSB;
 
-		decode_inst(um_inst, &prog_counter, &prog_size, &UMprogram);
+		switch (opcode) {
+			case 0: /* conditional move */
+				ra = (um_inst << RA_SL) >> R_SR;
+				rb = (um_inst << RB_SL) >> R_SR;
+		 		rc = (um_inst << RC_SL) >> R_SR;
+
+				if (regs[rc] != 0)
+					regs[ra] = regs[rb];
+
+				break;
+
+			case 1: /* segmented load */
+				ra = (um_inst << RA_SL) >> R_SR;
+				rb = (um_inst << RB_SL) >> R_SR;
+		 		rc = (um_inst << RC_SL) >> R_SR;
+
+				if (recent_id1 == regs[rb]) {
+					regs[ra] = *(recent_seg1 + (regs[rc] + 1));
+					break;
+				} 
+
+				if (recent_id2 == regs[rb]) {
+					regs[ra] = *(recent_seg2 + (regs[rc] + 1));
+					break;
+				}
+
+				if (!(regs[rb] & 1)) {
+		    		recent_id1 = regs[rb];
+		    		recent_seg1 = *(realMem + regs[rb]);
+		    		regs[ra] = *(recent_seg1 + (regs[rc] + 1));
+		 		} else { 
+		    		recent_id2 = regs[rb];
+		    		recent_seg2 = *(realMem + regs[rb]);
+		    		regs[ra] = *(recent_seg2 + (regs[rc] + 1));
+		 		}
+
+				break;
+
+			case 2: /* segmented store */
+				ra = (um_inst << RA_SL) >> R_SR;
+				rb = (um_inst << RB_SL) >> R_SR;
+		 		rc = (um_inst << RC_SL) >> R_SR;
+
+				if (recent_id1 == regs[ra]) {
+					*(recent_seg1 + (regs[rb] + 1)) = regs[rc];
+					break;
+				} 
+
+				if (recent_id2 == regs[ra]) {
+					*(recent_seg2 + (regs[rb] + 1)) = regs[rc];
+					break;
+				}
+
+				if (!(regs[ra] & 1)) {
+		    		recent_id1 = regs[ra];
+		    		recent_seg1 = *(realMem + regs[ra]);
+		    		*(recent_seg1 + (regs[rb] + 1)) = regs[rc];
+		 		} else { 
+		    		recent_id2 = regs[ra];
+		    		recent_seg2 = *(realMem + regs[ra]);
+		    		*(recent_seg2 + (regs[rb] + 1)) = regs[rc];
+		 		}
+
+				break;
+
+			case 3: /* addition */ 
+				ra = (um_inst << RA_SL) >> R_SR;
+				rb = (um_inst << RB_SL) >> R_SR;
+		 		rc = (um_inst << RC_SL) >> R_SR;
+
+				regs[ra] = regs[rb] + regs[rc];
+				break;
+
+			case 4: /* multiplcation */
+				ra = (um_inst << RA_SL) >> R_SR;
+				rb = (um_inst << RB_SL) >> R_SR;
+		 		rc = (um_inst << RC_SL) >> R_SR;
+
+				regs[ra] = (regs[rb] * regs[rc]) % REG_SIZE;
+				break;
+
+			case 5: /* divison */
+				ra = (um_inst << RA_SL) >> R_SR;
+				rb = (um_inst << RB_SL) >> R_SR;
+		 		rc = (um_inst << RC_SL) >> R_SR;
+
+				regs[ra] = (regs[rb] / regs[rc]) % REG_SIZE;
+				break;
+
+			case 6: /* NAND */
+				ra = (um_inst << RA_SL) >> R_SR;
+				rb = (um_inst << RB_SL) >> R_SR;
+		 		rc = (um_inst << RC_SL) >> R_SR;
+
+				regs[ra] = ~(regs[rb] & regs[rc]);
+				break;
+
+			case 7: /* halt */	
+		        mem_free();
+				exit(0);
+
+			case 8: /* map segment */
+				rb = (um_inst << RB_SL) >> R_SR;
+		 		rc = (um_inst << RC_SL) >> R_SR;
+
+				regs[rb] = map(regs[rc]);
+				if (regs[rb] == 0) {
+					fprintf(stderr, "Emulator out of memory");
+					mem_free();
+					exit(1);
+				}
+				break;
+
+			case 9: /* unmap segment */
+				rc = (um_inst << RC_SL) >> R_SR;
+				unmap(regs[rc]);
+				break;
+
+			case 10: /* output */
+				rc = (um_inst << RC_SL) >> R_SR;
+				c = regs[rc];
+				write(1, &c, 1);
+				break;
+
+			case 11: /* input */
+				rc = (um_inst << RC_SL) >> R_SR;
+
+				val = read(0, &c, 1);
+				if (val == 0)
+					regs[rc] = ~0;
+				else
+					regs[rc] = (uint32_t) c;
+
+				break;
+
+			case 12: /* load program */
+				rb = (um_inst << RB_SL) >> R_SR;
+				rc = (um_inst << RC_SL) >> R_SR; 
+		        if (regs[rb] != 0) {
+		            duplicate(regs[rb], 0);
+
+		        }
+
+				prog_counter = regs[rc] - 1;
+				break;
+
+			case 13: /* load value */
+				ra = (um_inst << OPCODE_WIDTH) >> R_SR;
+				regs[ra] = (um_inst << VAL_SL) >> VAL_SR;
+
+				break;
+		}
 		prog_counter++;
 	}
 
-}
-
-
-int decode_inst(uint32_t instruction, uint32_t* pc, uint32_t* ps, Segment* prog)
-{
-	uint32_t val;
-	char c;
-
-	/* extract opcode and indicies to regs[] */ 
-	uint32_t opcode = instruction >> OPCODE_LSB;
-	uint32_t ra;
-	uint32_t rb;
-	uint32_t rc;
-
-
-	switch (opcode) {
-		case 0: /* conditional move */
-			ra = (instruction << RA_SL) >> R_SR;
-			rb = (instruction << RB_SL) >> R_SR;
-	 		rc = (instruction << RC_SL) >> R_SR;
-
-			if (regs[rc] != 0)
-				regs[ra] = regs[rb];
-
-			break;
-
-		case 1: /* segmented load */
-			ra = (instruction << RA_SL) >> R_SR;
-			rb = (instruction << RB_SL) >> R_SR;
-	 		rc = (instruction << RC_SL) >> R_SR;
-
-			if (recent_id1 == regs[rb]) {
-				regs[ra] = *(recent_seg1 + (regs[rc] + 1));
-				break;
-			} 
-
-			if (recent_id2 == regs[rb]) {
-				regs[ra] = *(recent_seg2 + (regs[rc] + 1));
-				break;
-			}
-
-			if (!(regs[rb] & 1)) {
-        		recent_id1 = regs[rb];
-        		recent_seg1 = *(realMem + regs[rb]);
-        		regs[ra] = *(recent_seg1 + (regs[rc] + 1));
-     		} else { 
-        		recent_id2 = regs[rb];
-        		recent_seg2 = *(realMem + regs[rb]);
-        		regs[ra] = *(recent_seg2 + (regs[rc] + 1));
-     		}
-
-			break;
-
-		case 2: /* segmented store */
-			ra = (instruction << RA_SL) >> R_SR;
-			rb = (instruction << RB_SL) >> R_SR;
-	 		rc = (instruction << RC_SL) >> R_SR;
-
-			if (recent_id1 == regs[ra]) {
-				*(recent_seg1 + (regs[rb] + 1)) = regs[rc];
-				break;
-			} 
-
-			if (recent_id2 == regs[ra]) {
-				*(recent_seg2 + (regs[rb] + 1)) = regs[rc];
-				break;
-			}
-
-			if (!(regs[ra] & 1)) {
-        		recent_id1 = regs[ra];
-        		recent_seg1 = *(realMem + regs[ra]);
-        		*(recent_seg1 + (regs[rb] + 1)) = regs[rc];
-     		} else { 
-        		recent_id2 = regs[ra];
-        		recent_seg2 = *(realMem + regs[ra]);
-        		*(recent_seg2 + (regs[rb] + 1)) = regs[rc];
-     		}
-			// curr_segment = *(realMem + regs[ra]);
-			// *(curr_segment + (regs[rb] + 1)) = regs[rc];
-			break;
-
-		case 3: /* addition */ 
-			ra = (instruction << RA_SL) >> R_SR;
-			rb = (instruction << RB_SL) >> R_SR;
-	 		rc = (instruction << RC_SL) >> R_SR;
-
-			regs[ra] = regs[rb] + regs[rc];
-			break;
-
-		case 4: /* multiplcation */
-			ra = (instruction << RA_SL) >> R_SR;
-			rb = (instruction << RB_SL) >> R_SR;
-	 		rc = (instruction << RC_SL) >> R_SR;
-
-			regs[ra] = (regs[rb] * regs[rc]) % REG_SIZE;
-			break;
-
-		case 5: /* divison */
-			ra = (instruction << RA_SL) >> R_SR;
-			rb = (instruction << RB_SL) >> R_SR;
-	 		rc = (instruction << RC_SL) >> R_SR;
-
-			regs[ra] = (regs[rb] / regs[rc]) % REG_SIZE;
-			break;
-
-		case 6: /* NAND */
-			ra = (instruction << RA_SL) >> R_SR;
-			rb = (instruction << RB_SL) >> R_SR;
-	 		rc = (instruction << RC_SL) >> R_SR;
-
-			regs[ra] = ~(regs[rb] & regs[rc]);
-			break;
-
-		case 7: /* halt */	
-            mem_free();
-			exit(0);
-
-		case 8: /* map segment */
-			rb = (instruction << RB_SL) >> R_SR;
-	 		rc = (instruction << RC_SL) >> R_SR;
-
-			regs[rb] = map(regs[rc]);
-			if (regs[rb] == 0) {
-				fprintf(stderr, "Emulator out of memory");
-				mem_free();
-				exit(1);
-			}
-			break;
-
-		case 9: /* unmap segment */
-			rc = (instruction << RC_SL) >> R_SR;
-			unmap(regs[rc]);
-			break;
-
-		case 10: /* output */
-			rc = (instruction << RC_SL) >> R_SR;
-			c = regs[rc];
-			write(1, &c, 1);
-			break;
-
-		case 11: /* input */
-			rc = (instruction << RC_SL) >> R_SR;
-
-			val = read(0, &c, 1);
-			if (val == 0)
-				regs[rc] = ~0;
-			else
-				regs[rc] = (uint32_t) c;
-
-			break;
-
-		case 12: /* load program */
-			rb = (instruction << RB_SL) >> R_SR;
-			rc = (instruction << RC_SL) >> R_SR; 
-            if (regs[rb] != 0) {
-            	//fprintf(stderr, "changing program by duplicating --- ");
-                val = duplicate(regs[rb], 0);
-                *ps = val;
-                //fprintf(stderr, "ps is %u  pc is %u\n", val, regs[rc] - 1);
-            }
-            assert(prog);
-
-			*pc = regs[rc] - 1;
-			break;
-
-		case 13: /* load value */
-			ra = (instruction << OPCODE_WIDTH) >> R_SR;
-			regs[ra] = (instruction << VAL_SL) >> VAL_SR;
-
-			break;
-	}
-
-	return 0;	/* invalid opcode */
 }
 
 static inline uint32_t map(uint32_t size)
@@ -319,7 +300,7 @@ static inline void unmap(uint32_t segID)
     stkCount++;
 }
 
-static inline uint32_t duplicate(uint32_t toDup_ID, uint32_t toRep_ID)
+static inline void duplicate(uint32_t toDup_ID, uint32_t toRep_ID)
 {
 	Segment seg_dup = seg_copy(*(realMem + toDup_ID));
 
@@ -329,9 +310,7 @@ static inline uint32_t duplicate(uint32_t toDup_ID, uint32_t toRep_ID)
 	memUsed += *(seg_dup) - *(seg_rep);
 
 	seg_delete(seg_rep);
-
-	return *(seg_dup);
-
+	program_seg = seg_dup;
 }
 
 static inline void mem_free()
